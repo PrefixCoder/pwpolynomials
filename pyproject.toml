@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pwpolynomials"
+description = "Fit piecewise polynomials of different degrees to data"
+version = "0.0.1"
+license = {text = "MIT"}
+authors = [{ name="Mykyta Funtykov", email="nuntikov@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+]
+dependencies = ["numpy>=1.21.6"]
+
+[project.optional-dependencies]
+codegen = ["sympy>=1.7.1"]
+
+[project.urls]
+"Homepage" = "https://github.com/PrefixCoder/pwpolynomials"
