@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import numpy as np
 from numpy.polynomial import Polynomial
 
-import coefshifters
-import leastsquares
-import rvfinders
+import .coefshifters
+import .leastsquares
+import .rvfinders
 
 __version__ = "0.0.1"
 
