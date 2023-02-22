@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import numpy as np
 from numpy.polynomial import Polynomial
 
-import .coefshifters
-import .leastsquares
-import .rvfinders
+from .coefshifters import dispatcher as generic_coefshift
+from .leastsquares import dispatcher as generic_lstsq
+from .rvfinders import dispatcher as generic_findrv
 
 __version__ = "0.0.1"
 
@@ -111,7 +111,7 @@ def gen_test_pwpoly(p1, p2, size=300, randseed=None, errscale=None):
     errscale = errscale if errscale is not None else max(p1, p2)
     rng = np.random.default_rng(randseed)
     x = np.linspace(-3, 3, num=size)
-    error = rng.normal(scale=errscale, size=size)  # min +- 2*errscale
+    error = rng.normal(scale=errscale, size=size)
     a = rng.uniform(-0.3, 1, size=p1+1)
     b = rng.uniform(-0.1, 0.03, size=p2+1) 
     x0 = rng.uniform(-1, 1)
@@ -266,24 +266,22 @@ def twopolyfit_iterative(x, y, p1, p2, pad=5, precomputed_sums=None):
     best_coefs = None
     best_x0 = None
     argsummatrix = psums.argsummatrix(p1, p2)
-    pw_lstsq = leastsquares.dispatcher[p1, p2]
-    pw_rv = rvfinders.dispatcher[p1, p2]
-    # rvs = []
+    lstsq = generic_lstsq[p1, p2]
+    findrv = generic_findrv[p1, p2]
     for k in range(pad + 1, n - pad):
         x0 = x[k-1]
         sums = argsummatrix[k-1]
         try:
-            coefs = pw_lstsq(x0, k, n, *sums)
+            coefs = lstsq(x0, k, n, *sums)
         except np.linalg.LinAlgError as e:
             print(e, f'k={k}, x0={x0:.4g}, n={n}')
             continue
-        rv = pw_rv(x0, k, n, coefs[0], coefs[1], *sums)
-        # rvs.append(rv)
+        rv = findrv(x0, k, n, coefs[0], coefs[1], *sums)
         if rv < min_rv:
             best_coefs = coefs
             best_x0 = x0
             min_rv = rv
-    return PiecewisePolynomial(best_coefs, [best_x0])#, rvs
+    return PiecewisePolynomial(best_coefs, [best_x0])
 
 
 def dichotomy(f, a, b, eps=1e-3, key=lambda x: x):
@@ -309,16 +307,16 @@ def twopolyfit(x, y, p1, p2, pad=5, precomputed_sums=None):
     y = np.asanyarray(y)
     psums = precomputed_sums or precompute_pwpoly_sums(x, y, p1, p2)
     a, b = x[pad + 1], x[-pad]
-    pw_lstsq = leastsquares.dispatcher[p1, p2]    
-    pw_rv = rvfinders.dispatcher[p1, p2]
+    lstsq = generic_lstsq[p1, p2]
+    findrv = generic_findrv[p1, p2]
     argsummatrix = psums.argsummatrix(p1, p2)
     def func_to_minimise(x0):
         k = np.searchsorted(x, x0)
         sums = argsummatrix[k-1]
-        coefs = pw_lstsq(x0, k, n, *sums)
-        rv = pw_rv(x0, k, n, coefs[0], coefs[1], *sums)
+        coefs = lstsq(x0, k, n, *sums)
+        rv = findrv(x0, k, n, coefs[0], coefs[1], *sums)
         return coefs, rv
-    x0, (coefs, rv) = dichotomy(func_to_minimise, a, b, key=lambda res: res[1])
+    x0, (coefs, _) = dichotomy(func_to_minimise, a, b, key=lambda res: res[1])
     return PiecewisePolynomial(coefs, [x0])
 
 
@@ -333,7 +331,7 @@ def twopolyfit_given_knot(x, y, x0_or_k, p1, p2, precomputed_sums=None, passed_k
         sums = _argsums(x, y, k, p1, p2)
     else:
         sums = precompute_pwpoly_sums(x, y, p1, p2).to_args(k, p1, p2)
-    coefs = leastsquares.dispatcher[p1, p2](x0, k, len(x), *sums)
+    coefs = generic_lstsq[p1, p2](x0, k, len(x), *sums)
     return PiecewisePolynomial(coefs, [x0])
 
 
@@ -432,7 +430,6 @@ def find_knots(x, y, p, scorer=BIC, min_slope=10):
             spline_powers.append(poly.degree())
             m.append(i_end)
             break
-    # end while True
     return m, spline_powers
 
 
@@ -469,11 +466,9 @@ def multipolyfit(x, y, p, scorer=BIC, min_slope=10, connect=True):
                     for j in range(1, spline_p+1)
                 ])
                 coef[1:] = np.linalg.solve(T, R)
-            #end else
             shifted_coefs.append(coef)
-        #end for i in range(1, n_slines)
         coefs = [
-            coefshifters.dispatcher[len(coef)-1](coef, x[m[i]])
+            generic_coefshift[len(coef)-1](coef, x[m[i]])
             for i, coef in enumerate(shifted_coefs)
         ]
     else:
